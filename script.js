@@ -1,7 +1,20 @@
+let audioCtx;
+let noise, lfo, ampLFO, ampOffset;
+let stopTimer;
+
 const startBtn = document.getElementById("startBtn");
 
 startBtn.onclick = () => {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioCtx) {
+    startWind();
+    startBtn.textContent = "Stop Sound";
+  } else {
+    stopWind();
+  }
+};
+
+function startWind() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
   function createWhiteNoise(audioCtx) {
     const bufferSize = 10 * audioCtx.sampleRate;
@@ -12,13 +25,13 @@ startBtn.onclick = () => {
       output[i] = Math.random() * 2 - 1;
     }
 
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    return noise;
+    const source = audioCtx.createBufferSource();
+    source.buffer = noiseBuffer;
+    source.loop = true;
+    return source;
   }
 
-  const noise = createWhiteNoise(audioCtx);
+  noise = createWhiteNoise(audioCtx);
 
   const highpass = audioCtx.createBiquadFilter();
   highpass.type = "highpass";
@@ -29,40 +42,58 @@ startBtn.onclick = () => {
   bandpass.frequency.value = 700;
   bandpass.Q.value = 1.2;
 
-  const windGain = audioCtx.createGain();
-  windGain.gain.value = 0.12;
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0.12;
 
-  const lfo = audioCtx.createOscillator();
+  lfo = audioCtx.createOscillator();
   lfo.type = "sine";
   lfo.frequency.value = 0.18;
 
   const lfoGain = audioCtx.createGain();
   lfoGain.gain.value = 350;
 
-  const ampLFO = audioCtx.createOscillator();
+  ampLFO = audioCtx.createOscillator();
   ampLFO.type = "sine";
   ampLFO.frequency.value = 0.09;
 
   const ampDepth = audioCtx.createGain();
   ampDepth.gain.value = 0.05;
 
-  const ampOffset = audioCtx.createConstantSource();
+  ampOffset = audioCtx.createConstantSource();
   ampOffset.offset.value = 0.10;
 
   lfo.connect(lfoGain);
   lfoGain.connect(bandpass.frequency);
 
   ampLFO.connect(ampDepth);
-  ampDepth.connect(windGain.gain);
-  ampOffset.connect(windGain.gain);
+  ampDepth.connect(gain.gain);
+  ampOffset.connect(gain.gain);
 
   noise.connect(highpass);
   highpass.connect(bandpass);
-  bandpass.connect(windGain);
-  windGain.connect(audioCtx.destination);
+  bandpass.connect(gain);
+  gain.connect(audioCtx.destination);
 
   noise.start();
   lfo.start();
   ampLFO.start();
   ampOffset.start();
-};
+
+  stopTimer = setTimeout(() => {
+    stopWind();
+  }, 10000);
+}
+
+function stopWind() {
+  if (stopTimer) {
+    clearTimeout(stopTimer);
+    stopTimer = null;
+  }
+
+  if (audioCtx) {
+    audioCtx.close();
+    audioCtx = null;
+  }
+
+  startBtn.textContent = "Start Sound";
+}
